@@ -5,20 +5,16 @@
     <Nullable>disable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Stardew Valley">
-      <HintPath>..\libs\StardewValley.dll</HintPath>
+    <Reference Include="StardewValley">
+      <HintPath>libs\StardewValley.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="StardewModdingAPI">
-      <HintPath>..\libs\StardewModdingAPI.dll</HintPath>
+      <HintPath>libs\StardewModdingAPI.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="MonoGame.Framework">
-      <HintPath>..\libs\MonoGame.Framework.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="0Harmony">
-      <HintPath>..\libs\0Harmony.dll</HintPath>
+      <HintPath>libs\MonoGame.Framework.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
