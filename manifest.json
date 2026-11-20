@@ -1,0 +1,10 @@
+{
+  "Name": "DesertTraderBulk",
+  "Author": "Kamu",
+  "Version": "1.0.0",
+  "Description": "Bulk trade Omni Geode -> Artifact Trove di Desert Trader. x10 dan MAX.",
+  "UniqueID": "Kamu.DesertTraderBulk",
+  "EntryDll": "DesertTraderBulk.dll",
+  "MinimumApiVersion": "4.0.0",
+  "UpdateKeys": []
+}
