@@ -8,8 +8,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
-      - run: dotnet build DesertTraderBulk/DesertTraderBulk.csproj -c Release
+      - run: |
+          CSPROJ=$(find . -name "*.csproj" | head -n 1)
+          echo "Found $CSPROJ"
+          dotnet build "$CSPROJ" -c Release
       - uses: actions/upload-artifact@v4
         with:
           name: DesertTraderBulk
-          path: DesertTraderBulk/DesertTraderBulk/bin/Release/net6.0/
+          path: "**/bin/Release/net6.0/"
