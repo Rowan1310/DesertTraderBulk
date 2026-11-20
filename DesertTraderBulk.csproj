@@ -2,8 +2,24 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <Nullable>disable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.1.1" />
+    <Reference Include="Stardew Valley">
+      <HintPath>..\libs\StardewValley.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="StardewModdingAPI">
+      <HintPath>..\libs\StardewModdingAPI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="MonoGame.Framework">
+      <HintPath>..\libs\MonoGame.Framework.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>..\libs\0Harmony.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
 </Project>
