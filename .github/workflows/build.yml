@@ -12,29 +12,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 6
+      - name: Setup .NET 9
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 6.0.x
+          dotnet-version: 9.0.x
 
       - name: Restore
         run: dotnet restore DesertTraderBulk.vbproj
 
       - name: Build
-        run: dotnet build DesertTraderBulk.vbproj --configuration Release --no-restore
+        run: dotnet build DesertTraderBulk.vbproj -c Release --no-restore
 
-      - name: Prepare mod package
+      - name: Prepare package
         run: |
           mkdir -p package/DesertTraderBulk
           cp manifest.json package/DesertTraderBulk/
-          cp bin/Release/net6.0/DesertTraderBulk.dll package/DesertTraderBulk/
+          cp bin/Release/net9.0/DesertTraderBulk.dll package/DesertTraderBulk/
           cd package
           zip -r ../DesertTraderBulk.zip DesertTraderBulk
 
-      - name: Upload artifact
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: DesertTraderBulk-Android
