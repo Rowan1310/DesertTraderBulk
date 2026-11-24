@@ -7,10 +7,10 @@
     <OptionStrict>Off</OptionStrict>
     <OptionExplicit>On</OptionExplicit>
     <OptionInfer>On</OptionInfer>
-    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
   </PropertyGroup>
 
   <ItemGroup>
+
     <Reference Include="StardewValley">
       <HintPath>libs/StardewValley.dll</HintPath>
       <Private>false</Private>
@@ -25,6 +25,12 @@
       <HintPath>libs/MonoGame.Framework.dll</HintPath>
       <Private>false</Private>
     </Reference>
+
+    <Reference Include="xTile">
+      <HintPath>libs/xTile.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
   </ItemGroup>
 
 </Project>
