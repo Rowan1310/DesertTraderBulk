@@ -1,18 +1,42 @@
-name: Build
-on: [push]
+
+name: Build DesertTraderBulk
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
-      - run: |
-          CSPROJ=$(find . -name "*.csproj" | head -n 1)
-          echo "Found $CSPROJ"
-          dotnet build "$CSPROJ" -c Release
-      - uses: actions/upload-artifact@v4
+          dotnet-version: 6.0.x
+
+      - name: Restore
+        run: dotnet restore DesertTraderBulk.vbproj
+
+      - name: Build
+        run: dotnet build DesertTraderBulk.vbproj --configuration Release --no-restore
+
+      - name: Prepare mod package
+        run: |
+          mkdir -p package/DesertTraderBulk
+          cp manifest.json package/DesertTraderBulk/
+          cp bin/Release/net6.0/DesertTraderBulk.dll package/DesertTraderBulk/
+          cd package
+          zip -r ../DesertTraderBulk.zip DesertTraderBulk
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: DesertTraderBulk
-          path: "**/bin/Release/net6.0/"
+          name: DesertTraderBulk-Android
+          path: DesertTraderBulk.zip
+          
