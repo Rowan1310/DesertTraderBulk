@@ -6,6 +6,7 @@ Imports StardewModdingAPI.Events
 Imports StardewValley
 Imports StardewValley.Menus
 Imports System.Linq
+Imports System.Reflection
 
 Public Class Entry
     Inherits [Mod]
@@ -16,9 +17,14 @@ Public Class Entry
 
     Public Overrides Sub Entry(helper As IModHelper)
 
-        helper.Events.Display.MenuChanged += AddressOf OnMenuChanged
-        helper.Events.Display.Rendered += AddressOf OnRendered
-        helper.Events.Input.ButtonPressed += AddressOf OnButtonPressed
+        AddHandler helper.Events.Display.MenuChanged,
+            AddressOf OnMenuChanged
+
+        AddHandler helper.Events.Display.Rendered,
+            AddressOf OnRendered
+
+        AddHandler helper.Events.Input.ButtonPressed,
+            AddressOf OnButtonPressed
 
         Monitor.Log(
             "Desert Trader Bulk loaded!",
@@ -42,27 +48,39 @@ Public Class Entry
     )
 
         If Not showButtons Then Return
+        If Not Context.IsWorldReady Then Return
 
-        Dim shop = TryCast(Game1.activeClickableMenu, ShopMenu)
+        Dim shop As ShopMenu =
+            TryCast(Game1.activeClickableMenu, ShopMenu)
 
         If shop Is Nothing Then Return
 
-        If Not Context.IsWorldReady Then Return
-
-        Dim hovered = GetHoveredItem(shop)
+        Dim hovered As StardewValley.Item =
+            GetHoveredItem(shop)
 
         If hovered Is Nothing Then Return
 
         If hovered.Name <> "Artifact Trove" Then Return
 
-        Dim x As Integer = Game1.uiViewport.Width \ 2 - 220
+        Dim x As Integer =
+            Game1.uiViewport.Width \ 2 - 220
+
         Dim y As Integer = 80
 
         btn10 = New Rectangle(x, y, 200, 64)
         btnMax = New Rectangle(x + 220, y, 200, 64)
 
-        DrawButton(e.SpriteBatch, btn10, "Tukar x10")
-        DrawButton(e.SpriteBatch, btnMax, "Tukar MAX")
+        DrawButton(
+            e.SpriteBatch,
+            btn10,
+            "Tukar x10"
+        )
+
+        DrawButton(
+            e.SpriteBatch,
+            btnMax,
+            "Tukar MAX"
+        )
 
     End Sub
 
@@ -80,7 +98,8 @@ Public Class Entry
 
         Dim font = Game1.dialogueFont
 
-        Dim size As Vector2 = font.MeasureString(buttonText)
+        Dim size As Vector2 =
+            font.MeasureString(buttonText)
 
         Dim position As New Vector2(
             r.X + (r.Width - size.X) / 2,
@@ -105,11 +124,13 @@ Public Class Entry
 
         If e.Button <> SButton.MouseLeft Then Return
 
-        Dim shop = TryCast(Game1.activeClickableMenu, ShopMenu)
+        Dim shop As ShopMenu =
+            TryCast(Game1.activeClickableMenu, ShopMenu)
 
         If shop Is Nothing Then Return
 
-        Dim hovered = GetHoveredItem(shop)
+        Dim hovered As StardewValley.Item =
+            GetHoveredItem(shop)
 
         If hovered Is Nothing Then Return
 
@@ -140,16 +161,14 @@ Public Class Entry
 
         End If
 
-        If amount <= 0 Then Return
-
-        ' Batas berdasarkan jumlah Omni Geode
-
         amount = Math.Min(amount, omni \ 5)
 
-        ' Tambahkan Artifact Trove terlebih dahulu.
-        ' Hanya item yang berhasil masuk yang akan dibayar.
+        If amount <= 0 Then Return
 
         Dim added As Integer = 0
+
+        ' Tambahkan trove terlebih dahulu.
+        ' Pembayaran hanya dilakukan untuk item yang berhasil masuk.
 
         For i As Integer = 1 To amount
 
@@ -166,13 +185,18 @@ Public Class Entry
 
         Next
 
-        ' Potong Omni Geode sesuai jumlah yang berhasil dibeli.
-
         If added > 0 Then
 
             RemoveOmni(added * 5)
 
             Game1.playSound("coin")
+
+            Monitor.Log(
+                "Successfully exchanged " &
+                added.ToString() &
+                " Artifact Trove.",
+                LogLevel.Info
+            )
 
         End If
 
@@ -187,16 +211,22 @@ Public Class Entry
         Try
 
             Dim trove = shop.forSale.FirstOrDefault(
-                Function(it) it IsNot Nothing AndAlso
-                it.Name = "Artifact Trove"
+                Function(it)
+                    Return it IsNot Nothing AndAlso
+                           it.Name = "Artifact Trove"
+                End Function
             )
 
-            Return TryCast(trove, StardewValley.Item)
+            Return TryCast(
+                trove,
+                StardewValley.Item
+            )
 
         Catch ex As Exception
 
             Monitor.Log(
-                "Unable to detect Artifact Trove: " & ex.Message,
+                "Unable to detect Artifact Trove: " &
+                ex.Message,
                 LogLevel.Warn
             )
 
@@ -205,6 +235,93 @@ Public Class Entry
         End Try
 
     End Function
+
+    ' Mengakses Stack melalui Reflection.
+    ' Ini menghindari konflik nama anggota Stack di VB.NET.
+
+    Private Function GetItemStack(
+        item As StardewValley.Item
+    ) As Integer
+
+        Dim itemType As Type = item.GetType()
+
+        Dim stackProperty As PropertyInfo =
+            itemType.GetProperty(
+                "Stack",
+                BindingFlags.Public Or
+                BindingFlags.NonPublic Or
+                BindingFlags.Instance
+            )
+
+        If stackProperty IsNot Nothing Then
+
+            Return CInt(stackProperty.GetValue(item))
+
+        End If
+
+        Dim stackField As FieldInfo =
+            itemType.GetField(
+                "stack",
+                BindingFlags.Public Or
+                BindingFlags.NonPublic Or
+                BindingFlags.Instance
+            )
+
+        If stackField IsNot Nothing Then
+
+            Return CInt(stackField.GetValue(item))
+
+        End If
+
+        Throw New MissingMemberException(
+            "Unable to find item stack member."
+        )
+
+    End Function
+
+    Private Sub SetItemStack(
+        item As StardewValley.Item,
+        value As Integer
+    )
+
+        Dim itemType As Type = item.GetType()
+
+        Dim stackProperty As PropertyInfo =
+            itemType.GetProperty(
+                "Stack",
+                BindingFlags.Public Or
+                BindingFlags.NonPublic Or
+                BindingFlags.Instance
+            )
+
+        If stackProperty IsNot Nothing AndAlso
+           stackProperty.CanWrite Then
+
+            stackProperty.SetValue(item, value)
+            Return
+
+        End If
+
+        Dim stackField As FieldInfo =
+            itemType.GetField(
+                "stack",
+                BindingFlags.Public Or
+                BindingFlags.NonPublic Or
+                BindingFlags.Instance
+            )
+
+        If stackField IsNot Nothing Then
+
+            stackField.SetValue(item, value)
+            Return
+
+        End If
+
+        Throw New MissingMemberException(
+            "Unable to set item stack member."
+        )
+
+    End Sub
 
     Private Function CountOmni() As Integer
 
@@ -215,7 +332,7 @@ Public Class Entry
             If item IsNot Nothing AndAlso
                item.Name = "Omni Geode" Then
 
-                total += item.Stack
+                total += GetItemStack(item)
 
             End If
 
@@ -236,15 +353,20 @@ Public Class Entry
             If item IsNot Nothing AndAlso
                item.Name = "Omni Geode" Then
 
-                Dim take As Integer = Math.Min(
-                    item.Stack,
-                    need
-                )
+                Dim currentStack As Integer =
+                    GetItemStack(item)
 
-                item.Stack -= take
+                Dim take As Integer =
+                    Math.Min(currentStack, need)
+
+                Dim remaining As Integer =
+                    currentStack - take
+
+                SetItemStack(item, remaining)
+
                 need -= take
 
-                If item.Stack <= 0 Then
+                If remaining <= 0 Then
                     Game1.player.Items(i) = Nothing
                 End If
 
@@ -255,4 +377,4 @@ Public Class Entry
     End Sub
 
 End Class
-                      
+                                        
