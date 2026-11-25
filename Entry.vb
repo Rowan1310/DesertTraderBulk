@@ -1,5 +1,6 @@
 
 Imports System
+Imports System.Reflection
 Imports Microsoft.Xna.Framework
 Imports Microsoft.Xna.Framework.Graphics
 Imports StardewModdingAPI
@@ -19,10 +20,6 @@ Public Class Entry
     Private showButtons As Boolean = False
     Private buttonsReady As Boolean = False
 
-    ' ==================================================
-    ' ENTRY
-    ' ==================================================
-
     Public Overrides Sub Entry(helper As IModHelper)
 
         AddHandler helper.Events.Display.MenuChanged,
@@ -41,10 +38,6 @@ Public Class Entry
 
     End Sub
 
-    ' ==================================================
-    ' MENU CHANGED
-    ' ==================================================
-
     Private Sub OnMenuChanged(
         sender As Object,
         e As MenuChangedEventArgs
@@ -58,9 +51,65 @@ Public Class Entry
 
     End Sub
 
-    ' ==================================================
-    ' DETEKSI ARTIFACT TROVE
-    ' ==================================================
+    ' Membaca Stack tanpa memicu konflik nama di VB.NET.
+    Private Function GetItemStackCount(
+        item As StardewValley.Item
+    ) As Integer
+
+        If item Is Nothing Then Return 0
+
+        Try
+
+            Dim members As MemberInfo() =
+                item.GetType().GetMember(
+                    "Stack",
+                    BindingFlags.Instance Or
+                    BindingFlags.Public Or
+                    BindingFlags.NonPublic
+                )
+
+            For Each member As MemberInfo In members
+
+                If TypeOf member Is PropertyInfo Then
+
+                    Dim prop As PropertyInfo =
+                        DirectCast(member, PropertyInfo)
+
+                    If prop.GetIndexParameters().Length = 0 Then
+
+                        Return Convert.ToInt32(
+                            prop.GetValue(item, Nothing)
+                        )
+
+                    End If
+
+                End If
+
+                If TypeOf member Is FieldInfo Then
+
+                    Dim field As FieldInfo =
+                        DirectCast(member, FieldInfo)
+
+                    Return Convert.ToInt32(
+                        field.GetValue(item)
+                    )
+
+                End If
+
+            Next
+
+        Catch ex As Exception
+
+            Monitor.Log(
+                "Failed to read item stack: " & ex.Message,
+                LogLevel.Warn
+            )
+
+        End Try
+
+        Return 0
+
+    End Function
 
     Private Function FindArtifactTroveIndex(
         shop As ShopMenu
@@ -94,10 +143,6 @@ Public Class Entry
 
     End Function
 
-    ' ==================================================
-    ' POSISI TOMBOL PEMBELIAN NATIVE
-    ' ==================================================
-
     Private Function GetTroveClickPoint(
         shop As ShopMenu,
         ByRef clickPoint As Point
@@ -124,10 +169,6 @@ Public Class Entry
         Return True
 
     End Function
-
-    ' ==================================================
-    ' DRAW BUTTONS
-    ' ==================================================
 
     Private Sub OnRenderedActiveMenu(
         sender As Object,
@@ -211,10 +252,6 @@ Public Class Entry
 
     End Sub
 
-    ' ==================================================
-    ' HITUNG TROVE DI INVENTARIS DAN KURSOR TOKO
-    ' ==================================================
-
     Private Function CountTrove() As Integer
 
         Dim total As Integer = 0
@@ -226,7 +263,7 @@ Public Class Entry
             If item IsNot Nothing AndAlso
                item.QualifiedItemId = TROVE_ID Then
 
-                total += item.Stack
+                total += GetItemStackCount(item)
 
             End If
 
@@ -243,7 +280,7 @@ Public Class Entry
             If held IsNot Nothing AndAlso
                held.QualifiedItemId = TROVE_ID Then
 
-                total += held.Stack
+                total += GetItemStackCount(held)
 
             End If
 
@@ -253,22 +290,11 @@ Public Class Entry
 
     End Function
 
-    ' ==================================================
-    ' MAX PURCHASE
-    ' ==================================================
-
     Private Function GetMaximumBatch() As Integer
-
-        ' Batas keamanan untuk mencegah
-        ' loop transaksi yang terlalu panjang.
 
         Return MAX_PURCHASE_LIMIT
 
     End Function
-
-    ' ==================================================
-    ' BUTTON PRESSED
-    ' ==================================================
 
     Private Sub OnButtonPressed(
         sender As Object,
@@ -335,10 +361,6 @@ Public Class Entry
 
     End Sub
 
-    ' ==================================================
-    ' NATIVE SHOP TRANSACTION
-    ' ==================================================
-
     Private Sub ExchangeThroughNativeShop(
         shop As ShopMenu,
         requestedAmount As Integer
@@ -356,8 +378,6 @@ Public Class Entry
 
             For i As Integer = 1 To requestedAmount
 
-                ' Pastikan menu masih aktif.
-
                 If Game1.activeClickableMenu IsNot shop Then
                     Exit For
                 End If
@@ -373,14 +393,8 @@ Public Class Entry
 
                 End If
 
-                ' Hitung jumlah sebelum transaksi.
-
                 Dim previousTotal As Integer =
                     CountTrove()
-
-                ' PANGGIL SHOPMENU NATIVE.
-                ' Tidak membuat item secara manual.
-                ' Tidak mengurangi Omni Geode secara manual.
 
                 shop.receiveLeftClick(
                     clickPoint.X,
@@ -388,13 +402,8 @@ Public Class Entry
                     True
                 )
 
-                ' Hitung jumlah setelah transaksi.
-
                 Dim currentTotal As Integer =
                     CountTrove()
-
-                ' Jika jumlah tidak bertambah,
-                ' transaksi tidak berhasil.
 
                 If currentTotal <= previousTotal Then
                     Exit For
@@ -404,10 +413,6 @@ Public Class Entry
                     currentTotal - previousTotal
 
             Next
-
-            ' ==================================================
-            ' MASUKKAN HELD ITEM KE INVENTARIS
-            ' ==================================================
 
             Dim trove As StardewValley.Item =
                 TryCast(shop.heldItem, StardewValley.Item)
@@ -429,10 +434,6 @@ Public Class Entry
                 End If
 
             End If
-
-            ' ==================================================
-            ' LOG
-            ' ==================================================
 
             If successfulPurchases > 0 Then
 
