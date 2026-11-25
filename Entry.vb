@@ -11,12 +11,17 @@ Public Class Entry
     Inherits [Mod]
 
     Private Const TROVE_ID As String = "(O)275"
+    Private Const MAX_PURCHASE_LIMIT As Integer = 999
 
     Private btn10 As Rectangle
     Private btnMax As Rectangle
 
     Private showButtons As Boolean = False
     Private buttonsReady As Boolean = False
+
+    ' ==================================================
+    ' ENTRY
+    ' ==================================================
 
     Public Overrides Sub Entry(helper As IModHelper)
 
@@ -37,7 +42,7 @@ Public Class Entry
     End Sub
 
     ' ==================================================
-    ' DETEKSI MENU TOKO
+    ' MENU CHANGED
     ' ==================================================
 
     Private Sub OnMenuChanged(
@@ -90,7 +95,7 @@ Public Class Entry
     End Function
 
     ' ==================================================
-    ' MENCARI POSISI TOMBOL PEMBELIAN NATIVE
+    ' POSISI TOMBOL PEMBELIAN NATIVE
     ' ==================================================
 
     Private Function GetTroveClickPoint(
@@ -121,7 +126,7 @@ Public Class Entry
     End Function
 
     ' ==================================================
-    ' MENGGAMBAR TOMBOL
+    ' DRAW BUTTONS
     ' ==================================================
 
     Private Sub OnRenderedActiveMenu(
@@ -138,7 +143,6 @@ Public Class Entry
             TryCast(Game1.activeClickableMenu, ShopMenu)
 
         If shop Is Nothing Then Return
-
         If Not HasArtifactTrove(shop) Then Return
 
         Dim centerX As Integer =
@@ -208,68 +212,62 @@ Public Class Entry
     End Sub
 
     ' ==================================================
-    ' JUMLAH MAKSIMUM STACK ARTIFACT TROVE
+    ' HITUNG TROVE DI INVENTARIS DAN KURSOR TOKO
     ' ==================================================
 
-    Private Function GetMaximumBatch(
-        shop As ShopMenu
-    ) As Integer
+    Private Function CountTrove() As Integer
 
-        If shop Is Nothing Then Return 0
+        Dim total As Integer = 0
 
-        Dim held As StardewValley.Item =
-            TryCast(shop.heldItem, StardewValley.Item)
+        If Not Context.IsWorldReady Then Return 0
 
-        If held IsNot Nothing Then
+        For Each item As StardewValley.Item In Game1.player.Items
 
-            If held.QualifiedItemId <> TROVE_ID Then
-                Return 0
+            If item IsNot Nothing AndAlso
+               item.QualifiedItemId = TROVE_ID Then
+
+                total += item.Stack
+
             End If
 
-            Return Math.Max(
-                0,
-                held.maximumStackSize() - held.Stack
-            )
+        Next
+
+        Dim shop As ShopMenu =
+            TryCast(Game1.activeClickableMenu, ShopMenu)
+
+        If shop IsNot Nothing Then
+
+            Dim held As StardewValley.Item =
+                TryCast(shop.heldItem, StardewValley.Item)
+
+            If held IsNot Nothing AndAlso
+               held.QualifiedItemId = TROVE_ID Then
+
+                total += held.Stack
+
+            End If
 
         End If
 
-        Dim sample As StardewValley.Item =
-            ItemRegistry.Create(TROVE_ID)
-
-        If sample Is Nothing Then Return 0
-
-        Return Math.Max(
-            1,
-            sample.maximumStackSize()
-        )
+        Return total
 
     End Function
 
     ' ==================================================
-    ' MEMBACA STACK TROVE YANG SEDANG DIPEGANG
+    ' MAX PURCHASE
     ' ==================================================
 
-    Private Function GetHeldTroveStack(
-        shop As ShopMenu
-    ) As Integer
+    Private Function GetMaximumBatch() As Integer
 
-        If shop Is Nothing Then Return 0
+        ' Batas keamanan untuk mencegah
+        ' loop transaksi yang terlalu panjang.
 
-        Dim held As StardewValley.Item =
-            TryCast(shop.heldItem, StardewValley.Item)
-
-        If held Is Nothing Then Return 0
-
-        If held.QualifiedItemId <> TROVE_ID Then
-            Return 0
-        End If
-
-        Return held.Stack
+        Return MAX_PURCHASE_LIMIT
 
     End Function
 
     ' ==================================================
-    ' MENANGANI KLIK TOMBOL
+    ' BUTTON PRESSED
     ' ==================================================
 
     Private Sub OnButtonPressed(
@@ -287,7 +285,6 @@ Public Class Entry
             TryCast(Game1.activeClickableMenu, ShopMenu)
 
         If shop Is Nothing Then Return
-
         If Not HasArtifactTrove(shop) Then Return
 
         Dim mousePosition As New Point(
@@ -303,7 +300,7 @@ Public Class Entry
 
         ElseIf btnMax.Contains(mousePosition) Then
 
-            amount = GetMaximumBatch(shop)
+            amount = GetMaximumBatch()
 
         Else
 
@@ -312,6 +309,17 @@ Public Class Entry
         End If
 
         Helper.Input.Suppress(e.Button)
+
+        Dim held As StardewValley.Item =
+            TryCast(shop.heldItem, StardewValley.Item)
+
+        If held IsNot Nothing AndAlso
+           held.QualifiedItemId <> TROVE_ID Then
+
+            Game1.playSound("cancel")
+            Return
+
+        End If
 
         If amount <= 0 Then
 
@@ -328,7 +336,7 @@ Public Class Entry
     End Sub
 
     ' ==================================================
-    ' TRANSAKSI MELALUI SHOPMENU NATIVE
+    ' NATIVE SHOP TRANSACTION
     ' ==================================================
 
     Private Sub ExchangeThroughNativeShop(
@@ -342,22 +350,13 @@ Public Class Entry
             Return
         End If
 
-        Dim existingHeld As StardewValley.Item =
-            TryCast(shop.heldItem, StardewValley.Item)
-
-        If existingHeld IsNot Nothing AndAlso
-           existingHeld.QualifiedItemId <> TROVE_ID Then
-
-            Game1.playSound("cancel")
-            Return
-
-        End If
-
         Dim successfulPurchases As Integer = 0
 
         Try
 
             For i As Integer = 1 To requestedAmount
+
+                ' Pastikan menu masih aktif.
 
                 If Game1.activeClickableMenu IsNot shop Then
                     Exit For
@@ -370,21 +369,18 @@ Public Class Entry
                     clickPoint
                 ) Then
 
-                    Monitor.Log(
-                        "Artifact Trove shop button is not visible.",
-                        LogLevel.Warn
-                    )
-
                     Exit For
 
                 End If
 
-                Dim previousStack As Integer =
-                    GetHeldTroveStack(shop)
+                ' Hitung jumlah sebelum transaksi.
 
-                ' PANGGIL TRANSAKSI SHOPMENU NATIVE.
-                ' Harmony patch Building Chest Supply
-                ' berkesempatan memproses material di sini.
+                Dim previousTotal As Integer =
+                    CountTrove()
+
+                ' PANGGIL SHOPMENU NATIVE.
+                ' Tidak membuat item secara manual.
+                ' Tidak mengurangi Omni Geode secara manual.
 
                 shop.receiveLeftClick(
                     clickPoint.X,
@@ -392,23 +388,25 @@ Public Class Entry
                     True
                 )
 
-                Dim currentStack As Integer =
-                    GetHeldTroveStack(shop)
+                ' Hitung jumlah setelah transaksi.
 
-                ' Tidak ada penambahan stack berarti
-                ' transaksi gagal atau material habis.
+                Dim currentTotal As Integer =
+                    CountTrove()
 
-                If currentStack <= previousStack Then
+                ' Jika jumlah tidak bertambah,
+                ' transaksi tidak berhasil.
+
+                If currentTotal <= previousTotal Then
                     Exit For
                 End If
 
                 successfulPurchases +=
-                    currentStack - previousStack
+                    currentTotal - previousTotal
 
             Next
 
             ' ==================================================
-            ' MEMASUKKAN HASIL KE INVENTARIS
+            ' MASUKKAN HELD ITEM KE INVENTARIS
             ' ==================================================
 
             Dim trove As StardewValley.Item =
@@ -423,9 +421,6 @@ Public Class Entry
 
                 Else
 
-                    ' Jika inventaris penuh, jangan buang item.
-                    ' Biarkan item tetap berada di kursor toko.
-
                     Monitor.Log(
                         "Inventory full. Artifact Trove remains held.",
                         LogLevel.Warn
@@ -435,6 +430,10 @@ Public Class Entry
 
             End If
 
+            ' ==================================================
+            ' LOG
+            ' ==================================================
+
             If successfulPurchases > 0 Then
 
                 Monitor.Log(
@@ -442,6 +441,10 @@ Public Class Entry
                     successfulPurchases.ToString(),
                     LogLevel.Info
                 )
+
+            Else
+
+                Game1.playSound("cancel")
 
             End If
 
@@ -458,82 +461,4 @@ Public Class Entry
     End Sub
 
 End Class
-                                                            currentType = currentType.BaseType
-
-        End While
-
-        Throw New MissingMemberException(
-            "Unable to set item stack member."
-        )
-
-    End Sub
-
-    ' ==================================================
-    ' MENGHITUNG OMNI GEODE
-    ' ==================================================
-
-    Private Function CountOmni() As Integer
-
-        Dim total As Integer = 0
-
-        For Each item As StardewValley.Item In Game1.player.Items
-
-            If item IsNot Nothing AndAlso
-               item.QualifiedItemId = OMNI_ID Then
-
-                total += GetItemStack(item)
-
-            End If
-
-        Next
-
-        Return total
-
-    End Function
-
-    ' ==================================================
-    ' MENGURANGI OMNI GEODE
-    ' ==================================================
-
-    Private Sub RemoveOmni(need As Integer)
-
-        If need <= 0 Then Return
-
-        For i As Integer = 0 To Game1.player.Items.Count - 1
-
-            If need <= 0 Then Exit For
-
-            Dim item As StardewValley.Item =
-                Game1.player.Items(i)
-
-            If item Is Nothing Then Continue For
-
-            If item.QualifiedItemId = OMNI_ID Then
-
-                Dim currentStack As Integer =
-                    GetItemStack(item)
-
-                Dim take As Integer =
-                    Math.Min(currentStack, need)
-
-                Dim remaining As Integer =
-                    currentStack - take
-
-                SetItemStack(item, remaining)
-
-                need -= take
-
-                If remaining <= 0 Then
-
-                    Game1.player.Items(i) = Nothing
-
-                End If
-
-            End If
-
-        Next
-
-    End Sub
-
-End Class
-                                                    
+                                            
